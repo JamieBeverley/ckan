@@ -1,0 +1,1 @@
+Give a name to foreign key constraint from `resource` to `package` to fix migration downgrade.

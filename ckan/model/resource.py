@@ -34,8 +34,12 @@ resource_table = Table(
     'resource', meta.metadata,
     Column('id', types.UnicodeText, primary_key=True,
            default=_types.make_uuid),
-    Column('package_id', types.UnicodeText,
-           ForeignKey('package.id'), nullable=False),
+    Column(
+        'package_id',
+        types.UnicodeText,
+        ForeignKey(column='package.id', name="resource_package_id_fkey"),
+        nullable=False
+    ),
     Column('url', types.UnicodeText, nullable=False, doc='remove_if_not_provided'),
     # XXX: format doc='remove_if_not_provided' makes lots of tests fail, fix tests?
     Column('format', types.UnicodeText),
