@@ -6,44 +6,14 @@ Create Date: 2025-03-06 21:25:57.216365
 
 """
 from alembic import op
-from ckan import model
 import sqlalchemy as sa
 from sqlalchemy.dialects import postgresql
-from sqlalchemy.engine.reflection import Inspector
 
 # revision identifiers, used by Alembic.
 revision = '4a5e3465beb6'
 down_revision = '9f33a0280c51'
 branch_labels = None
 depends_on = None
-
-
-def _get_resource_pkg_fk_constraint_name(op) -> str:
-    resource_table_name = model.resource_table.name
-    resource_column_name = 'package_id'
-
-    package_table_name = model.package_table.name
-    package_column_name = 'id'
-
-    bind = op.get_bind()
-    inspector = Inspector.from_engine(bind)
-    fkeys = inspector.get_foreign_keys(resource_table_name)
-    for fk in fkeys:
-        if (
-            fk['constrained_columns'] == [resource_column_name] and
-            fk['referred_table'] == package_table_name and
-            fk['referred_columns'] == [package_column_name]
-        ):
-            return fk['name']
-
-    raise ValueError(
-        'No foreign key constraint found for '
-        '{0}.{1} -> {2}'.format(
-            resource_table_name,
-            resource_column_name,
-            package_table_name
-        )
-    )
 
 
 def upgrade():
@@ -87,8 +57,21 @@ def downgrade():
     op.add_column('resource', sa.Column('webstore_last_updated',
                   postgresql.TIMESTAMP(), autoincrement=False,
                   nullable=True))
-    op.drop_constraint(_get_resource_pkg_fk_constraint_name(op),
-                       'resource', type_='foreignkey')
+    # Drop unnamed resource.package_id->package.id foreignkey constraint
+    conn = op.get_bind()
+    conn.execute(sa.text(
+        '''
+        DO $$
+        DECLARE fk_name TEXT;
+        BEGIN
+            SELECT conname INTO fk_name FROM pg_constraint
+            WHERE conrelid = 'resource'::regclass
+            AND contype = 'f'
+            LIMIT 1;
+            EXECUTE format('ALTER TABLE resource DROP CONSTRAINT %I', fk_name);
+        END $$;
+    '''
+    ))
     op.create_table(
         'rating',
         sa.Column('id', sa.TEXT(), autoincrement=False, nullable=False),
